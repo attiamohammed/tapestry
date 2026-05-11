@@ -180,7 +180,9 @@ async def artwork_proxy(identifier: str):
     via a canvas without CORS issues. Restricted to archive.org by URL
     construction (no user-controlled host).
     """
-    url = f"https://archive.org/services/img/{identifier}"
+    #url = f"https://archive.org/services/img/{identifier}"
+    url = "https://blog.archive.org/wp-content/uploads/2023/09/16_9-logo-white-letters-on-black.png"
+
     try:
         r = await app.state.http.get(url, timeout=10.0, follow_redirects=True)
     except httpx.HTTPError as e:
