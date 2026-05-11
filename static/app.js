@@ -1852,7 +1852,7 @@ async function refreshStatus() {
 
       // Apply LMS artwork (works for local library tracks and Plex streams
       // whose cover was injected by a plugin like squeeze-plex-hub).
-      const coverUrl = s.current.cover_url || "";
+      const coverUrl = s.current.cover_url || "https://blog.archive.org/wp-content/uploads/2023/09/16_9-logo-white-letters-on-black.png";
       const rack = document.querySelector(".rack");
       if (rack && coverUrl && !state.currentItem) {
         const cacheKey = "lms:" + coverUrl;
@@ -2121,6 +2121,7 @@ function init() {
     const file = $("#mixSaveCover").files?.[0] || null;
     const status = $("#mixSaveStatus");
     try {
+      
       let coverUrl = "";
       if (file) {
         status.textContent = "uploading cover…";
