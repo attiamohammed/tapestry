@@ -139,22 +139,28 @@ class LyrionBackend:
         return out
 
     async def get_status(self, client: httpx.AsyncClient, player_id: str) -> dict[str, Any]:
-        # Tags: a=artist d=duration K=artwork_track_id l=album J=artwork_url (remote/Plex)
-        # Requesting both K and J covers local library tracks and Plex/external streams
-        # whose cover was injected via setRemoteMetadata (as the squeeze-plex-hub plugin does).
-        result = await _rpc(client, player_id, ["status", "-", "1", "tags:adKlJ"])
+        # Tags: a=artist d=duration K=artwork_track_id l=album c=coverart (remote URL)
+        # tag c carries the full remote cover URL injected by plugins like squeeze-plex-hub
+        # via setRemoteMetadata; K covers local library tracks.
+        result = await _rpc(client, player_id, ["status", "-", "1", "tags:adKlc"])
         if not isinstance(result, dict):
             return {}
         loop = result.get("playlist_loop", [])
         track = loop[0] if loop else {}
 
-        # Build the LMS artwork proxy URL when we have an artwork_track_id.
-        # LMS exposes cover art at {base}/music/{id}/cover.jpg — we route it
-        # through /api/artwork/lms/{id} to avoid CORS issues on canvas reads.
-        cover_url = ""
-        artwork_id = track.get("artwork_track_id") or track.get("coverid")
-        if artwork_id:
-            cover_url = f"/api/artwork/lms/{artwork_id}"
+        # Priority: tag c (full remote URL set by plex-hub / LMS plugin) →
+        # local proxy from artwork_track_id → archive.org fallback logo.
+        FALLBACK_ART = "https://blog.archive.org/wp-content/uploads/2023/09/16_9-logo-white-letters-on-black.png"
+        cover_url = (
+            track.get("coverart")   # tag c — remote URL injected by squeeze-plex-hub
+            or ""
+        )
+        if not cover_url:
+            artwork_id = track.get("artwork_track_id") or track.get("coverid")
+            if artwork_id:
+                cover_url = f"/api/artwork/lms/{artwork_id}"
+        if not cover_url:
+            cover_url = FALLBACK_ART
 
         return {
             "mode": result.get("mode", ""),
