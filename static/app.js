@@ -1849,6 +1849,28 @@ async function refreshStatus() {
           track: t || "—",
         });
       }
+
+      // Apply LMS artwork (works for local library tracks and Plex streams
+      // whose cover was injected by a plugin like squeeze-plex-hub).
+      const coverUrl = s.current.cover_url || "";
+      const rack = document.querySelector(".rack");
+      if (rack && coverUrl && !state.currentItem) {
+        const cacheKey = "lms:" + coverUrl;
+        const probe = new Image();
+        probe.decoding = "async";
+        probe.onload = () => {
+          rack.style.setProperty("--album-art", `url("${coverUrl}")`);
+        };
+        probe.onerror = () => rack.style.removeProperty("--album-art");
+        probe.src = coverUrl;
+        extractPaletteFromImage(cacheKey, coverUrl).then((extracted) => {
+          if (!extracted || state.currentItem) return;
+          applyDeckStyle({ ...extracted });
+        });
+      } else if (rack && !coverUrl && !state.currentItem) {
+        rack.style.removeProperty("--album-art");
+      }
+
       state.spoolCtx = {
         consumedBefore: 0,
         total: s.duration || 0,

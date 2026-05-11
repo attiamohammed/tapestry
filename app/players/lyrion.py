@@ -139,11 +139,23 @@ class LyrionBackend:
         return out
 
     async def get_status(self, client: httpx.AsyncClient, player_id: str) -> dict[str, Any]:
-        result = await _rpc(client, player_id, ["status", "-", "1", "tags:adKl"])
+        # Tags: a=artist d=duration K=artwork_track_id l=album J=artwork_url (remote/Plex)
+        # Requesting both K and J covers local library tracks and Plex/external streams
+        # whose cover was injected via setRemoteMetadata (as the squeeze-plex-hub plugin does).
+        result = await _rpc(client, player_id, ["status", "-", "1", "tags:adKlJ"])
         if not isinstance(result, dict):
             return {}
         loop = result.get("playlist_loop", [])
         track = loop[0] if loop else {}
+
+        # Build the LMS artwork proxy URL when we have an artwork_track_id.
+        # LMS exposes cover art at {base}/music/{id}/cover.jpg — we route it
+        # through /api/artwork/lms/{id} to avoid CORS issues on canvas reads.
+        cover_url = ""
+        artwork_id = track.get("artwork_track_id") or track.get("coverid")
+        if artwork_id:
+            cover_url = f"/api/artwork/lms/{artwork_id}"
+
         return {
             "mode": result.get("mode", ""),
             "power": bool(result.get("power", 0)),
@@ -158,6 +170,7 @@ class LyrionBackend:
                 "album": track.get("album", ""),
                 "url": track.get("url", ""),
                 "duration": track.get("duration"),
+                "cover_url": cover_url,
             } if track else None,
         }
 

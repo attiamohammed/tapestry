@@ -146,6 +146,34 @@ async def search(
     return {"results": results, "count": len(results)}
 
 
+@app.get("/api/artwork/lms/{track_id}")
+async def lms_artwork_proxy(track_id: str):
+    """Proxy LMS cover art so the frontend can read it on a canvas without CORS.
+
+    LMS exposes artwork at {server}/music/{artwork_track_id}/cover.jpg.
+    This mirrors what the squeeze-plex-hub plugin injects via setRemoteMetadata:
+    a cover URL pointing back to the LMS server, which we must proxy for the
+    same-origin canvas palette extraction to work.
+    """
+    import re
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", track_id):
+        raise HTTPException(status_code=400, detail="invalid track id")
+    base = settings.lyrion_url().rsplit("/", 1)[0]  # strip /jsonrpc.js
+    url = f"{base}/music/{track_id}/cover.jpg"
+    try:
+        r = await app.state.http.get(url, timeout=10.0, follow_redirects=True)
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=f"LMS artwork fetch failed: {e}")
+    if r.status_code != 200:
+        raise HTTPException(status_code=r.status_code, detail="artwork unavailable")
+    media_type = r.headers.get("content-type", "image/jpeg").split(";")[0].strip()
+    return Response(
+        content=r.content,
+        media_type=media_type,
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
 @app.get("/api/artwork/{identifier}")
 async def artwork_proxy(identifier: str):
     """Proxy archive.org artwork so the frontend can extract dominant colors
